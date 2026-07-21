@@ -17,17 +17,19 @@ Replace this paragraph with your own summary of what your version does.
 
 ## How The System Works
 
-Explain your design in plain language.
+Real-world recommenders like Spotify or YouTube blend two main strategies: collaborative filtering, which predicts what a listener will like based on the behavior of other users with similar taste, and content-based filtering, which matches a song's own attributes (genre, tempo, mood) against a listener's known preferences. Production systems combine both, plus signals like NLP-mined cultural context, so they can recommend brand-new songs with no listening history yet as well as songs backed by strong social proof. Our simulation implements only the content-based half: each `Song` carries genre, mood, energy, tempo_bpm, valence, danceability, and acousticness, and each `UserProfile` stores a single listener's favorite_genre, favorite_mood, target_energy, and likes_acoustic preference. The `Recommender` scores every song by combining a categorical match on genre and mood (weighted most heavily, since they capture most of what makes a song feel "right") with a numeric closeness score on energy, computed as `1 - |song_energy - target_energy|` so songs are rewarded for being close to the user's target rather than simply high or low energy. Songs are then ranked by total score and the top `k` are returned as recommendations. Because there's no data on other listeners, our system can't yet capture "people like you also liked" style discovery unlike real platforms that use collaborative filtering to introduce discovery. This recommender will always lean toward recommending more of what a user already says they like.
 
-Some prompts to answer:
+**Scoring Formula:**
 
-- What features does each `Song` use in your system
-  - For example: genre, mood, energy, tempo
-- What information does your `UserProfile` store
-- How does your `Recommender` compute a score for each song
-- How do you choose which songs to recommend
+```
+total_score = (0.4 × genre_match) + (0.3 × mood_match) + (0.2 × energy_score) + (0.1 × acoustic_score)
 
-You can include a simple diagram or bullet list if helpful.
+where:
+  genre_match    = 1 if song.genre == profile.favorite_genre else 0
+  mood_match     = 1 if song.mood == profile.favorite_mood else 0
+  energy_score   = 1 - |song.energy - profile.target_energy|
+  acoustic_score = (1 - song.acousticness) if not profile.likes_acoustic else song.acousticness
+```
 
 ---
 
@@ -68,15 +70,40 @@ You can add more tests in `tests/test_recommender.py`.
 
 ## Sample Recommendation Output
 
-Paste a sample of your recommender's output here as a text block so a reader can see what it produces:
+```text
+============================================================
+Top 5 Recommendations
+============================================================
 
-```
-# e.g.:
-# User profile: genre=indie, mood=chill, energy=low
-# Recommendations:
-#   1. ...
-#   2. ...
-#   3. ...
+1. Sunrise City — Score: 0.98
+   - Genre match: pop (+0.40)
+   - Mood match: happy (+0.30)
+   - Energy closeness: 0.82 vs target 0.80 (+0.20)
+   - Low acousticness preference: 0.18 (+0.08)
+
+2. Gym Hero — Score: 0.67
+   - Genre match: pop (+0.40)
+   - Mood mismatch: intense vs happy (0.00)
+   - Energy closeness: 0.93 vs target 0.80 (+0.17)
+   - Low acousticness preference: 0.05 (+0.10)
+
+3. Rooftop Lights — Score: 0.56
+   - Genre mismatch: indie pop vs pop (0.00)
+   - Mood match: happy (+0.30)
+   - Energy closeness: 0.76 vs target 0.80 (+0.19)
+   - Low acousticness preference: 0.35 (+0.07)
+
+4. Neon Dreams — Score: 0.27
+   - Genre mismatch: electronic vs pop (0.00)
+   - Mood mismatch: energetic vs happy (0.00)
+   - Energy closeness: 0.88 vs target 0.80 (+0.18)
+   - Low acousticness preference: 0.12 (+0.09)
+
+5. Storm Runner — Score: 0.27
+   - Genre mismatch: rock vs pop (0.00)
+   - Mood mismatch: intense vs happy (0.00)
+   - Energy closeness: 0.91 vs target 0.80 (+0.18)
+   - Low acousticness preference: 0.10 (+0.09)
 ```
 
 **Screenshot or video** *(optional)*: <!-- Insert a screenshot or demo video link here -->
@@ -102,6 +129,12 @@ Examples:
 - It only works on a tiny catalog
 - It does not understand lyrics or language
 - It might over favor one genre or mood
+
+**Expected Biases in This System:**
+
+- **Genre/mood dominance**: Genre and mood are binary (exact match or nothing) and make up 70% of the score, while energy and acoustic use a more forgiving distance-based score. A musically-adjacent genre (e.g., "indie pop" vs. "pop") gets zero credit even if every numeric feature matches well, so the system can overprioritize categorical match over actual "feel" fit.
+- **Catalog imbalance**: `lofi` and `pop` have multiple entries in the dataset while `classical`, `metal`, and `folk` have only one each. A user favoring an underrepresented genre will get fewer (or zero) genre matches, skewing results toward whatever is overrepresented in the catalog rather than reflecting genuine taste quality.
+- **Weak acoustic signal**: `likes_acoustic` carries only 10% of the total score, so a stated acoustic preference can be nearly invisible in the final ranking when it conflicts with genre and mood preferences.
 
 You will go deeper on this in your model card.
 
